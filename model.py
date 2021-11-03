@@ -19,22 +19,24 @@ class EncoderCNN(nn.Module):
         features = features.view(features.size(0), -1)
         features = self.embed(features)
         return features
-    
 
+        
 class DecoderRNN(nn.Module):
     def __init__(self, embed_size, hidden_size, vocab_size, num_layers=1):
         ''' Initialize the layers of this model.'''
-        super().__init__()
+        super(DecoderRNN,self).__init__()
         
-        self.hidden_dim = hidden_size
+        self.hidden_size = hidden_size
         self.num_layers = num_layers
+        self.vocab_size = vocab_size
+        self.embed_size = embed_size
         # embedding layer that turns words into a vector of a specified size
-        self.word_embeddings = nn.Embedding(vocab_size, embed_size)
+        self.word_embeddings = nn.Embedding(num_embeddings=self.vocab_size, embedding_dim=self.embed_size)
 
         # the LSTM takes embedded word vectors (of a specified size) as inputs, hidden_size layers, number of lstm layers (this time is 1)
         # Also, the dropout is set to 0 (no dropout) 
         self.lstm = nn.LSTM(input_size = embed_size, 
-                             hidden_size = hidden_size, 
+                             hidden_size = self.hidden_size, 
                              num_layers = self.num_layers, 
                              dropout = 0, 
                              batch_first=True
@@ -42,12 +44,12 @@ class DecoderRNN(nn.Module):
 
         # the linear layer that maps the hidden state output dimension 
         # to the number of tags we want as output, tagset_size (in this case this is 1 tag)
-        self.linear_fc = nn.Linear(hidden_size, vocab_size)
+        self.linear_fc = nn.Linear(self.hidden_size,self.vocab_size)
 
     
     def forward(self, features, captions):
         
-        # not include <end>
+        
         captions = captions[:, :-1]
         
         #Pass the captions through the embedding layer so that the model can find the relationships between the word tokens better.
@@ -72,14 +74,14 @@ class DecoderRNN(nn.Module):
         " accepts pre-processed image tensor (inputs) and returns predicted sentence (list of tensor ids of length max_len)"
         device = torch.device('cuda:0' if torch.cuda.is_available() else "cpu")
         
-        hidden = (torch.randn(self.num_layers, 1, self.hidden_dim).to(inputs.device),torch.randn(self.num_layers, 1, self.hidden_dim).to(inputs.device))
+        hidden = (torch.randn(self.num_layers, 1, self.hidden_size).to(inputs.device),torch.randn(self.num_layers, 1, self.hidden_size).to(inputs.device))
         
         #initiate an empty list
         sample_output = []
         
         while len(sample_output) < max_len:
             #Run the lstm and get the output
-            lstm_out, states = self.lstm( inputs, hidden)
+            lstm_out, states = self.lstm( inputs, states)
             outputs = self.linear_fc(lstm_out)
             
             #choose the word with the highest propability
